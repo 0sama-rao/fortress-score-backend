@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────
+
+enum AssetType {
+  DOMAIN
+  SUBDOMAIN
+  IP
+}
+
+enum ScanStatus {
+  PENDING
+  RUNNING
+  COMPLETE
+  FAILED
+}
+
+enum ScanCategory {
+  TLS
+  HEADERS
+  NETWORK
+  EMAIL
+}
+
+// ─────────────────────────────────────────
+// Auth
+// ─────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+
+  organizations Organization[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────
+// Core domain
+// ─────────────────────────────────────────
+
+model Organization {
+  id         String   @id @default(uuid())
+  userId     String
+  name       String
+  rootDomain String
+  createdAt  DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assets Asset[]
+  scans  Scan[]
+
+  @@index([userId])
+}
+
+model Asset {
+  id             String    @id @default(uuid())
+  organizationId String
+  type           AssetType
+  value          String
+  discoveredAt   DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  scanResults  ScanResult[]
+
+  @@unique([organizationId, value])
+  @@index([organizationId])
+}
+
+model Scan {
+  id             String     @id @default(uuid())
+  organizationId String
+  status         ScanStatus @default(PENDING)
+  fortressScore  Float?
+  tlsScore       Float?
+  headersScore   Float?
+  networkScore   Float?
+  emailScore     Float?
+  startedAt      DateTime   @default(now())
+  completedAt    DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  results      ScanResult[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, startedAt])
+}
+
+model ScanResult {
+  id        String       @id @default(uuid())
+  scanId    String
+  assetId   String
+  category  ScanCategory
+  riskScore Float
+  signals   Json
+  scannedAt DateTime     @default(now())
+
+  scan  Scan  @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([scanId, assetId, category])
+  @@index([scanId])
+}
