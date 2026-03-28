@@ -32,9 +32,10 @@ export default async function organizationsRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "name and rootDomain are required" });
       }
 
-      // Normalise: strip protocol and trailing slashes
+      // Normalise: strip protocol, www., and trailing slashes
       const domain = rootDomain
         .replace(/^https?:\/\//i, "")
+        .replace(/^www\./i, "")
         .replace(/\/+$/, "")
         .toLowerCase();
 
