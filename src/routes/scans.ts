@@ -1,6 +1,83 @@
 import type { FastifyInstance } from "fastify";
 import { addScanJob } from "../jobs/scanQueue.js";
 
+interface ScanWithResults {
+  fortressScore: number | null;
+  tlsScore: number | null;
+  headersScore: number | null;
+  networkScore: number | null;
+  emailScore: number | null;
+  results: Array<{
+    category: string;
+    riskScore: number;
+    signals: unknown;
+    asset: { value: string };
+  }>;
+  organization: { name: string; rootDomain: string };
+}
+
+function buildExecutiveSummary(scan: ScanWithResults) {
+  const issues: string[] = [];
+  const fixes: string[] = [];
+
+  for (const r of scan.results) {
+    const signals = r.signals as Record<string, unknown>;
+    if (!signals) continue;
+
+    if (r.category === "TLS") {
+      if (signals.noCertificate) { issues.push(`No TLS certificate on ${r.asset.value}`); fixes.push("Enable TLS/SSL on all public endpoints"); }
+      if (signals.certificateExpired) { issues.push(`Expired certificate on ${r.asset.value}`); fixes.push("Renew expired TLS certificates"); }
+      if (signals.weakProtocol) { issues.push("Weak TLS protocol (TLSv1/1.1) supported"); fixes.push("Disable TLSv1.0 and TLSv1.1 support"); }
+      if (signals.weakCipher) { issues.push("Weak cipher suites (RC4/DES/3DES) accepted"); fixes.push("Remove weak cipher suites from server configuration"); }
+      if (signals.noHttpsRedirect) { issues.push("No HTTP to HTTPS redirect"); fixes.push("Configure HTTP to HTTPS redirect on all web servers"); }
+      if (signals.weakSignature) { issues.push("Weak certificate signature algorithm (MD5/SHA1)"); fixes.push("Reissue certificates with SHA-256 or stronger signature"); }
+      if (signals.selfSigned) { issues.push(`Self-signed certificate on ${r.asset.value}`); fixes.push("Replace self-signed certificates with trusted CA-issued ones"); }
+    }
+
+    if (r.category === "HEADERS") {
+      if (signals.missingCsp) { issues.push("Missing Content-Security-Policy header"); fixes.push("Implement Content-Security-Policy header"); }
+      if (signals.missingHsts) { issues.push("Missing Strict-Transport-Security header"); fixes.push("Deploy HSTS with min 6-month max-age"); }
+      if (signals.weakCspPolicy) { issues.push("Weak CSP policy (unsafe-inline/unsafe-eval)"); fixes.push("Tighten CSP policy to remove unsafe directives"); }
+    }
+
+    if (r.category === "NETWORK") {
+      if (signals.rdpExposed) { issues.push("Public RDP exposed"); fixes.push("Disable public RDP access or restrict to VPN"); }
+      if (signals.telnetOpen) { issues.push("Telnet port open"); fixes.push("Disable Telnet and use SSH instead"); }
+      if (signals.ftpOpen) { issues.push("FTP port open"); fixes.push("Replace FTP with SFTP/SCP"); }
+      if (signals.dbPortsExposed) { issues.push("Database ports exposed to internet"); fixes.push("Restrict database access to internal networks only"); }
+      if (signals.smbExposed) { issues.push("SMB port exposed"); fixes.push("Block SMB (port 445) from public access"); }
+    }
+
+    if (r.category === "EMAIL") {
+      if (signals.spfMissing) { issues.push("No SPF record"); fixes.push("Add SPF record to DNS"); }
+      if (signals.dmarcMissing) { issues.push("No DMARC policy"); fixes.push("Deploy DMARC with reject policy"); }
+      if (signals.dkimMissing) { issues.push("No DKIM record found"); fixes.push("Configure DKIM signing for outbound email"); }
+      if (signals.dmarcPolicyNone) { issues.push("DMARC policy set to none"); fixes.push("Upgrade DMARC policy from none to quarantine/reject"); }
+    }
+  }
+
+  // Deduplicate
+  const uniqueIssues = [...new Set(issues)];
+  const uniqueFixes = [...new Set(fixes)];
+
+  // Score label
+  const score = scan.fortressScore ?? 0;
+  let posture = "Excellent";
+  if (score > 80) posture = "Critical";
+  else if (score > 60) posture = "High Risk";
+  else if (score > 40) posture = "Moderate";
+  else if (score > 20) posture = "Good";
+
+  return {
+    company: scan.organization.name,
+    domain: scan.organization.rootDomain,
+    fortressScore: scan.fortressScore,
+    posture,
+    keyIssues: uniqueIssues.slice(0, 10),
+    recommendedFixes: uniqueFixes.slice(0, 10),
+  };
+}
+
 export default async function scansRoutes(app: FastifyInstance) {
   // POST /api/scans — trigger a new scan
   app.post(
@@ -120,9 +197,14 @@ export default async function scansRoutes(app: FastifyInstance) {
         return reply.status(403).send({ error: "Forbidden" });
       }
 
+      // Build executive summary from findings
+      const executiveSummary = buildExecutiveSummary(scan);
+
       return reply.send({
         scanId: scan.id,
         status: scan.status,
+        fortressScore: scan.fortressScore,
+        executiveSummary,
         results: scan.results.map((r) => ({
           id: r.id,
           assetId: r.assetId,

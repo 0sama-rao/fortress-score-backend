@@ -6,11 +6,13 @@ import type { NetworkSignals } from "../types/scoring.js";
 const execFileAsync = promisify(execFile);
 const NMAP_TIMEOUT = 300000; // 5 minutes
 
-// Ports to scan
-const TARGET_PORTS = "22,23,25,80,443,445,1433,3306,3389,5432,5900,6379,8080,8443,27017";
+// Ports to scan (added 21 for FTP)
+const TARGET_PORTS = "21,22,23,25,80,443,445,1433,3306,3389,5432,5900,6379,8080,8443,27017";
+const TOTAL_SCANNED_PORTS = 16;
 
 // Critical service ports
 const CRITICAL_PORTS: Record<number, string> = {
+  21: "FTP",
   22: "SSH",
   23: "Telnet",
   3389: "RDP",
@@ -30,7 +32,10 @@ export async function scanNetwork(hostname: string): Promise<NetworkSignals> {
     rdpExposed: false,
     sshExposed: false,
     telnetOpen: false,
+    ftpOpen: false,
+    smbExposed: false,
     dbPortsExposed: false,
+    exposureFactor: 0,
   };
 
   try {
@@ -77,9 +82,14 @@ export async function scanNetwork(hostname: string): Promise<NetworkSignals> {
     signals.rdpExposed = signals.openPorts.includes(3389);
     signals.sshExposed = signals.openPorts.includes(22);
     signals.telnetOpen = signals.openPorts.includes(23);
+    signals.ftpOpen = signals.openPorts.includes(21);
+    signals.smbExposed = signals.openPorts.includes(445);
 
     const dbPorts = [1433, 3306, 5432, 6379, 27017];
     signals.dbPortsExposed = signals.openPorts.some((p) => dbPorts.includes(p));
+
+    // Exposure factor: ratio of open ports to total scanned ports
+    signals.exposureFactor = signals.openPorts.length / TOTAL_SCANNED_PORTS;
   } catch {
     // nmap failed or timed out — return empty signals
   }

@@ -14,26 +14,38 @@ import { computeCorrelationBonus } from "./correlationEngine.js";
 export const TLS_WEIGHTS = {
   noCertificate: 100,
   certificateExpired: 50,
+  weakSignature: 50,
   selfSigned: 40,
+  untrustedCA: 40,
+  noHttpsRedirect: 40,
   hostnameMismatch: 40,
+  weakKeyRsa1024: 70,
+  weakKeyRsa2048: 40,
+  weakKeyDsa2048: 40,
+  weakKeyEcc224: 40,
   weakProtocol: 30,
   weakCipher: 25,
+  longValidity: 20,
   wildcardCert: 10,
 } as const;
 
 export const HEADER_WEIGHTS = {
   missingCsp: 30,
   missingHsts: 25,
+  weakCspPolicy: 20,
   missingXFrameOptions: 10,
   missingXContentTypeOptions: 10,
   weakHstsMaxAge: 10,
   serverHeaderLeaksVersion: 5,
+  missingXXssProtection: 5,
 } as const;
 
 export const NETWORK_WEIGHTS = {
   telnetOpen: 70,
   dbPortsExposed: 70,
   rdpExposed: 60,
+  smbExposed: 60,
+  ftpOpen: 50,
   sshExposed: 40,
 } as const;
 
@@ -42,7 +54,9 @@ export const EMAIL_WEIGHTS = {
   spfPermissive: 60,
   spfMissing: 50,
   dkimMissing: 40,
+  dkimWeakKey: 40,
   dmarcPolicyNone: 30,
+  dmarcMisconfigured: 20,
 } as const;
 
 // Max possible score per category (sum of all weights)
@@ -67,11 +81,22 @@ export function scoreTLS(signals: TLSSignals): number {
   let risk = 0;
   if (signals.noCertificate) risk += TLS_WEIGHTS.noCertificate;
   if (signals.certificateExpired) risk += TLS_WEIGHTS.certificateExpired;
+  if (signals.weakSignature) risk += TLS_WEIGHTS.weakSignature;
   if (signals.selfSigned) risk += TLS_WEIGHTS.selfSigned;
+  if (signals.untrustedCA) risk += TLS_WEIGHTS.untrustedCA;
+  if (signals.noHttpsRedirect) risk += TLS_WEIGHTS.noHttpsRedirect;
   if (signals.hostnameMismatch) risk += TLS_WEIGHTS.hostnameMismatch;
   if (signals.weakProtocol) risk += TLS_WEIGHTS.weakProtocol;
   if (signals.weakCipher) risk += TLS_WEIGHTS.weakCipher;
+  if (signals.longValidity) risk += TLS_WEIGHTS.longValidity;
   if (signals.wildcardCert) risk += TLS_WEIGHTS.wildcardCert;
+
+  // Key size — only one applies
+  if (signals.weakKeySize === "rsa1024") risk += TLS_WEIGHTS.weakKeyRsa1024;
+  else if (signals.weakKeySize === "rsa2048") risk += TLS_WEIGHTS.weakKeyRsa2048;
+  else if (signals.weakKeySize === "dsa2048") risk += TLS_WEIGHTS.weakKeyDsa2048;
+  else if (signals.weakKeySize === "ecc224") risk += TLS_WEIGHTS.weakKeyEcc224;
+
   return Math.min(100, (risk / MAX_TLS) * 100);
 }
 
@@ -79,8 +104,10 @@ export function scoreHeaders(signals: HeaderSignals): number {
   let risk = 0;
   if (signals.missingCsp) risk += HEADER_WEIGHTS.missingCsp;
   if (signals.missingHsts) risk += HEADER_WEIGHTS.missingHsts;
+  if (signals.weakCspPolicy) risk += HEADER_WEIGHTS.weakCspPolicy;
   if (signals.missingXFrameOptions) risk += HEADER_WEIGHTS.missingXFrameOptions;
   if (signals.missingXContentTypeOptions) risk += HEADER_WEIGHTS.missingXContentTypeOptions;
+  if (signals.missingXXssProtection) risk += HEADER_WEIGHTS.missingXXssProtection;
   if (signals.weakHstsMaxAge) risk += HEADER_WEIGHTS.weakHstsMaxAge;
   if (signals.serverHeaderLeaksVersion) risk += HEADER_WEIGHTS.serverHeaderLeaksVersion;
   return Math.min(100, (risk / MAX_HEADERS) * 100);
@@ -91,6 +118,8 @@ export function scoreNetwork(signals: NetworkSignals): number {
   if (signals.telnetOpen) risk += NETWORK_WEIGHTS.telnetOpen;
   if (signals.dbPortsExposed) risk += NETWORK_WEIGHTS.dbPortsExposed;
   if (signals.rdpExposed) risk += NETWORK_WEIGHTS.rdpExposed;
+  if (signals.smbExposed) risk += NETWORK_WEIGHTS.smbExposed;
+  if (signals.ftpOpen) risk += NETWORK_WEIGHTS.ftpOpen;
   if (signals.sshExposed) risk += NETWORK_WEIGHTS.sshExposed;
   return Math.min(100, (risk / MAX_NETWORK) * 100);
 }
@@ -101,7 +130,9 @@ export function scoreEmail(signals: EmailSignals): number {
   if (signals.spfPermissive) risk += EMAIL_WEIGHTS.spfPermissive;
   if (signals.spfMissing) risk += EMAIL_WEIGHTS.spfMissing;
   if (signals.dkimMissing) risk += EMAIL_WEIGHTS.dkimMissing;
+  if (signals.dkimWeakKey) risk += EMAIL_WEIGHTS.dkimWeakKey;
   if (signals.dmarcPolicyNone) risk += EMAIL_WEIGHTS.dmarcPolicyNone;
+  if (signals.dmarcMisconfigured) risk += EMAIL_WEIGHTS.dmarcMisconfigured;
   return Math.min(100, (risk / MAX_EMAIL) * 100);
 }
 

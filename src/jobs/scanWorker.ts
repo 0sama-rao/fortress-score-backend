@@ -64,15 +64,15 @@ export function startScanWorker() {
           // Extract results (use defaults if scanner failed)
           const tlsSignals: TLSSignals = tlsResult.status === "fulfilled"
             ? tlsResult.value
-            : { noCertificate: true, certificateExpired: false, daysUntilExpiry: 0, selfSigned: false, weakProtocol: false, weakCipher: false, wildcardCert: false, hostnameMismatch: false };
+            : { noCertificate: true, certificateExpired: false, daysUntilExpiry: 0, selfSigned: false, weakProtocol: false, weakCipher: false, wildcardCert: false, hostnameMismatch: false, noHttpsRedirect: false, longValidity: false, weakKeySize: null, weakSignature: false, untrustedCA: false };
 
           const headerSignals: HeaderSignals = headersResult.status === "fulfilled"
             ? headersResult.value
-            : { missingHsts: true, missingCsp: true, missingXFrameOptions: true, missingXContentTypeOptions: true, weakHstsMaxAge: false, serverHeaderLeaksVersion: false };
+            : { missingHsts: true, missingCsp: true, missingXFrameOptions: true, missingXContentTypeOptions: true, missingXXssProtection: true, weakHstsMaxAge: false, weakCspPolicy: false, serverHeaderLeaksVersion: false };
 
           const networkSignals: NetworkSignals = networkResult.status === "fulfilled"
             ? networkResult.value
-            : { openPorts: [], criticalPortsOpen: [], rdpExposed: false, sshExposed: false, telnetOpen: false, dbPortsExposed: false };
+            : { openPorts: [], criticalPortsOpen: [], rdpExposed: false, sshExposed: false, telnetOpen: false, ftpOpen: false, smbExposed: false, dbPortsExposed: false, exposureFactor: 0 };
 
           allTLS.push(tlsSignals);
           allHeaders.push(headerSignals);

@@ -40,6 +40,11 @@ export interface TLSSignals {
   weakCipher: boolean;
   wildcardCert: boolean;
   hostnameMismatch: boolean;
+  noHttpsRedirect: boolean;
+  longValidity: boolean;
+  weakKeySize: "rsa1024" | "rsa2048" | "dsa2048" | "ecc224" | null;
+  weakSignature: boolean;
+  untrustedCA: boolean;
 }
 
 export interface HeaderSignals {
@@ -47,7 +52,9 @@ export interface HeaderSignals {
   missingCsp: boolean;
   missingXFrameOptions: boolean;
   missingXContentTypeOptions: boolean;
+  missingXXssProtection: boolean;
   weakHstsMaxAge: boolean;
+  weakCspPolicy: boolean;
   serverHeaderLeaksVersion: boolean;
 }
 
@@ -57,13 +64,18 @@ export interface NetworkSignals {
   rdpExposed: boolean;
   sshExposed: boolean;
   telnetOpen: boolean;
+  ftpOpen: boolean;
+  smbExposed: boolean;
   dbPortsExposed: boolean;
+  exposureFactor: number;
 }
 
 export interface EmailSignals {
   spfMissing: boolean;
   spfPermissive: boolean;
   dkimMissing: boolean;
+  dkimWeakKey: boolean;
   dmarcMissing: boolean;
   dmarcPolicyNone: boolean;
+  dmarcMisconfigured: boolean;
 }
