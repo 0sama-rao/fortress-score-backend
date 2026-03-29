@@ -1,14 +1,16 @@
 import "dotenv/config";
 import { buildApp } from "./app.js";
 import { startScanWorker } from "./jobs/scanWorker.js";
+import { startScheduledScans } from "./jobs/scheduledScans.js";
 
 const PORT = Number(process.env.PORT) || 3000;
 
 async function start() {
   const app = await buildApp();
 
-  // Start BullMQ worker AFTER app is ready (DB connection established)
+  // Start BullMQ workers AFTER app is ready (DB connection established)
   const worker = startScanWorker();
+  const { schedulerQueue, worker: schedulerWorker } = startScheduledScans();
 
   try {
     await app.listen({ port: PORT, host: "0.0.0.0" });
@@ -18,6 +20,8 @@ async function start() {
   }
 
   const shutdown = async () => {
+    await schedulerWorker.close();
+    await schedulerQueue.close();
     await worker.close();
     await app.close();
     process.exit(0);

@@ -7,6 +7,7 @@ import authRoutes from "./routes/auth.js";
 import organizationsRoutes from "./routes/organizations.js";
 import scansRoutes from "./routes/scans.js";
 import assetsRoutes from "./routes/assets.js";
+import scoresRoutes from "./routes/scores.js";
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -24,6 +25,7 @@ export async function buildApp() {
   await app.register(organizationsRoutes);
   await app.register(scansRoutes);
   await app.register(assetsRoutes);
+  await app.register(scoresRoutes);
 
   return app;
 }
