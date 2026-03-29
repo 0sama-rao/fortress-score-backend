@@ -40,5 +40,14 @@ services:
       redis:
         condition: service_started
 
+  frontend:
+    build:
+      context: ../fortress-score-ui
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+
 volumes:
   pgdata:
