@@ -43,6 +43,19 @@ export default async function scoresRoutes(app: FastifyInstance) {
           : 0;
       }
 
+      // Intelligence summary from Scan model directly
+      const intel = latestScan.intelligenceData as Record<string, unknown> | null;
+      const impacts = latestScan.businessImpactData as Array<{ severity: string }> | null;
+
+      const intelSummary = {
+        takeoverRisks: Array.isArray(intel?.subdomainTakeover) ? (intel.subdomainTakeover as unknown[]).length : 0,
+        exposedBuckets: Array.isArray(intel?.cloudExposure) ? (intel.cloudExposure as unknown[]).length : 0,
+        blocklistedIPs: Array.isArray(intel?.threatIntel) ? (intel.threatIntel as unknown[]).length : 0,
+        kevMatches: (intel?.vulnIntel as { totalKEVMatches?: number })?.totalKEVMatches ?? 0,
+        criticalImpacts: impacts ? impacts.filter((i) => i.severity === "CRITICAL").length : 0,
+        highImpacts: impacts ? impacts.filter((i) => i.severity === "HIGH").length : 0,
+      };
+
       return reply.send({
         organizationId: orgId,
         fortressScore: latestScan.fortressScore,
@@ -53,6 +66,7 @@ export default async function scoresRoutes(app: FastifyInstance) {
           email: { score: latestScan.emailScore, weight: 0.20 },
         },
         riskVelocity,
+        intelSummary,
         scanId: latestScan.id,
         scannedAt: latestScan.completedAt,
       });

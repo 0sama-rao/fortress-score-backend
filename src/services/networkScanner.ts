@@ -4,7 +4,7 @@ import { XMLParser } from "fast-xml-parser";
 import type { NetworkSignals } from "../types/scoring.js";
 
 const execFileAsync = promisify(execFile);
-const NMAP_TIMEOUT = 300000; // 5 minutes
+const NMAP_TIMEOUT = 60000; // 1 minute max per host
 
 // Ports to scan (added 21 for FTP)
 const TARGET_PORTS = "21,22,23,25,80,443,445,1433,3306,3389,5432,5900,6379,8080,8443,27017";
@@ -35,6 +35,7 @@ export async function scanNetwork(hostname: string): Promise<NetworkSignals> {
     ftpOpen: false,
     smbExposed: false,
     dbPortsExposed: false,
+    multipleWebPorts: false,
     exposureFactor: 0,
   };
 
@@ -45,7 +46,7 @@ export async function scanNetwork(hostname: string): Promise<NetworkSignals> {
     // -oX -: output XML to stdout
     const { stdout } = await execFileAsync(
       "nmap",
-      ["-sT", `-p${TARGET_PORTS}`, "--open", "-oX", "-", hostname],
+      ["-sT", `-p${TARGET_PORTS}`, "--open", "--host-timeout", "30s", "-T4", "-oX", "-", hostname],
       { timeout: NMAP_TIMEOUT }
     );
 
@@ -87,6 +88,11 @@ export async function scanNetwork(hostname: string): Promise<NetworkSignals> {
 
     const dbPorts = [1433, 3306, 5432, 6379, 27017];
     signals.dbPortsExposed = signals.openPorts.some((p) => dbPorts.includes(p));
+
+    // Multiple web ports (more than 2 of 80/443/8080/8443 open)
+    const webPorts = [80, 443, 8080, 8443];
+    const openWebPorts = signals.openPorts.filter((p) => webPorts.includes(p));
+    signals.multipleWebPorts = openWebPorts.length > 2;
 
     // Exposure factor: ratio of open ports to total scanned ports
     signals.exposureFactor = signals.openPorts.length / TOTAL_SCANNED_PORTS;

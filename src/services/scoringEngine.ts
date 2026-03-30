@@ -47,6 +47,7 @@ export const NETWORK_WEIGHTS = {
   smbExposed: 60,
   ftpOpen: 50,
   sshExposed: 40,
+  multipleWebPorts: 15,
 } as const;
 
 export const EMAIL_WEIGHTS = {
@@ -121,6 +122,7 @@ export function scoreNetwork(signals: NetworkSignals): number {
   if (signals.smbExposed) risk += NETWORK_WEIGHTS.smbExposed;
   if (signals.ftpOpen) risk += NETWORK_WEIGHTS.ftpOpen;
   if (signals.sshExposed) risk += NETWORK_WEIGHTS.sshExposed;
+  if (signals.multipleWebPorts) risk += NETWORK_WEIGHTS.multipleWebPorts;
   return Math.min(100, (risk / MAX_NETWORK) * 100);
 }
 

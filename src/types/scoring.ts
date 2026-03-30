@@ -67,6 +67,7 @@ export interface NetworkSignals {
   ftpOpen: boolean;
   smbExposed: boolean;
   dbPortsExposed: boolean;
+  multipleWebPorts: boolean;
   exposureFactor: number;
 }
 

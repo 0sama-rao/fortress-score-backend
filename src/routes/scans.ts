@@ -205,6 +205,8 @@ export default async function scansRoutes(app: FastifyInstance) {
         status: scan.status,
         fortressScore: scan.fortressScore,
         executiveSummary,
+        intelligenceData: scan.intelligenceData,
+        businessImpactData: scan.businessImpactData,
         results: scan.results.map((r) => ({
           id: r.id,
           assetId: r.assetId,
